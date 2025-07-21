@@ -124,13 +124,30 @@
             to { opacity: 1; }
         }
 
-        @keyframes pulse {
-            0%, 100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: 0.7;
-            }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-spinner {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .loading-spinner::after {
+            content: '';
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--glass-border);
+            border-top: 3px solid var(--text-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-top: 20px;
         }
 
         .theme-selector {
@@ -420,6 +437,7 @@
         .btn-danger { background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(239, 68, 68, 0.1)); }
         .btn-edit { background: linear-gradient(135deg, rgba(251, 191, 36, 0.3), rgba(251, 191, 36, 0.1)); }
         .btn-small { padding: 12px 24px; font-size: 0.9em; }
+        .btn-full { width: 100%; margin-top: 20px; }
 
         .input-group {
             display: flex;
@@ -706,12 +724,10 @@
             transform: translateX(120%);
             transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             box-shadow: 0 12px 32px var(--shadow-dark);
-            animation: pulse 2s infinite;
         }
 
         .notification.show {
             transform: translateX(0);
-            animation: none;
         }
 
         .notification.success {
@@ -806,6 +822,11 @@
     </style>
 </head>
 <body>
+    <!-- Loading inicial -->
+    <div id="initialLoading" class="loading-spinner">
+        Inicializando Firebase...
+    </div>
+
     <div class="theme-selector">
         <span class="theme-label">Tema:</span>
         <div class="theme-option theme-dark active" onclick="changeTheme('dark')" title="Oscuro"></div>
@@ -926,37 +947,406 @@
         </div>
     </div>
 
-    <!-- Cargar sistema de autenticación Firebase -->
-    <script type="module" src="./firebase-auth.js"></script>
+    <!-- Firebase SDKs (versión compat) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     
+    <!-- Sistema de autenticación Firebase -->
     <script>
-        // Variables globales
+        // Configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyAxSndE-CSWVBadNaH16nHsucNXOnPbeNQ",
+            authDomain: "trading-portfolio-76725.firebaseapp.com",
+            projectId: "trading-portfolio-76725",
+            storageBucket: "trading-portfolio-76725.firebasestorage.app",
+            messagingSenderId: "663381018558",
+            appId: "1:663381018558:web:bffc01b7b995441e661bef",
+            measurementId: "G-8Q1H5MHR0E"
+        };
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // Variables globales de la aplicación
         let portfolio = [];
         let currentEditingStock = null;
         let tempPositions = [];
         let portfolioName = '📈 Mi Cartera de Trading';
         let currentTheme = 'dark';
+        let currentUser = null;
+        let userData = null;
+        let portfolioData = null;
 
-        // Función para inicializar la aplicación
-        function initializeApp() {
-            if (!window.firebaseAuth || !window.firebaseAuth.isAuthenticated) {
-                return;
+        // Sistema de autenticación
+        class TradingAuthSystem {
+            constructor() {
+                this.setupAuthListener();
+                this.createAuthUI();
             }
-            
-            setupEventListeners();
-            renderPortfolio();
+
+            setupAuthListener() {
+                auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log('Usuario autenticado:', user.email);
+                        currentUser = user;
+                        await this.loadUserData();
+                        this.showMainApp();
+                    } else {
+                        console.log('Usuario no autenticado');
+                        currentUser = null;
+                        this.showAuthForm();
+                    }
+                });
+            }
+
+            createAuthUI() {
+                if (document.getElementById('authOverlay')) return;
+
+                const authHTML = `
+                    <div id="authOverlay" class="auth-overlay" style="
+                        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                        background: var(--bg-gradient); display: flex; align-items: center;
+                        justify-content: center; z-index: 2000;
+                    ">
+                        <div class="auth-container" style="
+                            background: var(--glass-bg); backdrop-filter: blur(40px) saturate(180%);
+                            border: 1px solid var(--glass-border); border-radius: 24px;
+                            padding: 40px; width: 100%; max-width: 450px;
+                            box-shadow: 0 20px 60px var(--shadow-dark), inset 0 1px 0 var(--shadow-light);
+                        ">
+                            <div class="auth-header" style="text-align: center; margin-bottom: 30px;">
+                                <h1 style="color: var(--text-primary); font-size: 2.5em; font-weight: 800; margin-bottom: 8px;">📈 Trading Portfolio</h1>
+                                <p style="color: var(--text-secondary); font-size: 1.1em;">Accede a tu cartera de inversiones</p>
+                            </div>
+                            
+                            <div class="auth-tabs" style="
+                                display: flex; margin-bottom: 30px; border-radius: 12px;
+                                background: var(--input-bg); padding: 4px;
+                            ">
+                                <button class="auth-tab active" data-tab="login" style="
+                                    flex: 1; padding: 12px 16px; border: none; background: var(--card-bg);
+                                    color: var(--text-primary); font-weight: 600; border-radius: 8px;
+                                    cursor: pointer; transition: all 0.3s ease;
+                                    box-shadow: 0 2px 8px var(--shadow-dark);
+                                ">Iniciar Sesión</button>
+                                <button class="auth-tab" data-tab="register" style="
+                                    flex: 1; padding: 12px 16px; border: none; background: transparent;
+                                    color: var(--text-secondary); font-weight: 600; border-radius: 8px;
+                                    cursor: pointer; transition: all 0.3s ease;
+                                ">Registrarse</button>
+                            </div>
+                            
+                            <!-- Login Form -->
+                            <form id="loginForm" class="auth-form active" style="display: block;">
+                                <div class="form-group">
+                                    <label for="loginEmail">Email</label>
+                                    <input type="email" id="loginEmail" required placeholder="tu@email.com">
+                                </div>
+                                <div class="form-group">
+                                    <label for="loginPassword">Contraseña</label>
+                                    <input type="password" id="loginPassword" required placeholder="Tu contraseña">
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-full">Iniciar Sesión</button>
+                            </form>
+                            
+                            <!-- Register Form -->
+                            <form id="registerForm" class="auth-form" style="display: none;">
+                                <div class="form-group">
+                                    <label for="registerEmail">Email</label>
+                                    <input type="email" id="registerEmail" required placeholder="tu@email.com">
+                                </div>
+                                <div class="form-group">
+                                    <label for="registerDisplayName">Nombre completo</label>
+                                    <input type="text" id="registerDisplayName" required placeholder="Tu nombre completo">
+                                </div>
+                                <div class="form-group">
+                                    <label for="registerPassword">Contraseña</label>
+                                    <input type="password" id="registerPassword" required placeholder="Mínimo 6 caracteres">
+                                </div>
+                                <div class="form-group">
+                                    <label for="registerConfirmPassword">Confirmar contraseña</label>
+                                    <input type="password" id="registerConfirmPassword" required placeholder="Confirma tu contraseña">
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-full">Registrarse</button>
+                            </form>
+                            
+                            <div class="auth-demo" style="
+                                margin-top: 30px; text-align: center; padding-top: 20px;
+                                border-top: 1px solid var(--table-border);
+                            ">
+                                <p style="color: var(--text-secondary); margin-bottom: 12px; font-size: 0.9em;">¿Quieres probar sin registrarte?</p>
+                                <button class="btn btn-secondary btn-small" type="button" id="demoBtn">Usar Demo</button>
+                                <small style="display: block; color: var(--text-muted); font-size: 0.8em; margin-top: 8px;">demo@test.com | demo123</small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                document.body.insertAdjacentHTML('beforeend', authHTML);
+                this.setupAuthEvents();
+            }
+
+            setupAuthEvents() {
+                // Tabs
+                document.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('auth-tab')) {
+                        this.switchTab(e.target.dataset.tab);
+                    } else if (e.target.id === 'demoBtn') {
+                        this.fillDemoCredentials();
+                    }
+                });
+
+                // Forms
+                document.addEventListener('submit', async (e) => {
+                    if (e.target.id === 'loginForm') {
+                        e.preventDefault();
+                        await this.handleLogin(e);
+                    } else if (e.target.id === 'registerForm') {
+                        e.preventDefault();
+                        await this.handleRegister(e);
+                    }
+                });
+            }
+
+            switchTab(tab) {
+                document.querySelectorAll('.auth-tab').forEach(t => {
+                    t.classList.remove('active');
+                    t.style.background = 'transparent';
+                    t.style.color = 'var(--text-secondary)';
+                    t.style.boxShadow = 'none';
+                });
+                
+                const activeTab = document.querySelector(`[data-tab="${tab}"]`);
+                activeTab.classList.add('active');
+                activeTab.style.background = 'var(--card-bg)';
+                activeTab.style.color = 'var(--text-primary)';
+                activeTab.style.boxShadow = '0 2px 8px var(--shadow-dark)';
+                
+                document.querySelectorAll('.auth-form').forEach(f => f.style.display = 'none');
+                document.getElementById(`${tab}Form`).style.display = 'block';
+            }
+
+            fillDemoCredentials() {
+                this.switchTab('login');
+                document.getElementById('loginEmail').value = 'demo@test.com';
+                document.getElementById('loginPassword').value = 'demo123';
+            }
+
+            async handleLogin(e) {
+                const email = document.getElementById('loginEmail').value;
+                const password = document.getElementById('loginPassword').value;
+                
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                const originalText = submitBtn.textContent;
+                submitBtn.textContent = 'Iniciando sesión...';
+                submitBtn.disabled = true;
+
+                try {
+                    await auth.signInWithEmailAndPassword(email, password);
+                } catch (error) {
+                    showNotification(this.getErrorMessage(error), 'error');
+                } finally {
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                }
+            }
+
+            async handleRegister(e) {
+                const email = document.getElementById('registerEmail').value;
+                const password = document.getElementById('registerPassword').value;
+                const confirmPassword = document.getElementById('registerConfirmPassword').value;
+                const displayName = document.getElementById('registerDisplayName').value;
+                
+                if (password !== confirmPassword) {
+                    showNotification('Las contraseñas no coinciden', 'error');
+                    return;
+                }
+
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                const originalText = submitBtn.textContent;
+                submitBtn.textContent = 'Registrando...';
+                submitBtn.disabled = true;
+
+                try {
+                    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                    await userCredential.user.updateProfile({ displayName: displayName });
+                    
+                    // Crear datos iniciales
+                    await this.saveUserData(userCredential.user.uid, {
+                        email: email,
+                        displayName: displayName,
+                        settings: { theme: 'dark', currency: 'USD', notifications: true },
+                        createdAt: new Date().toISOString()
+                    });
+
+                    await this.savePortfolio([], '📈 Mi Cartera de Trading');
+                    showNotification('Registro exitoso. ¡Bienvenido!', 'success');
+                } catch (error) {
+                    showNotification(this.getErrorMessage(error), 'error');
+                } finally {
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
+                }
+            }
+
+            async loadUserData() {
+                if (!currentUser) return;
+
+                try {
+                    // Cargar datos del usuario
+                    const userDoc = await db.collection("users").doc(currentUser.uid).get();
+                    userData = userDoc.exists ? userDoc.data() : null;
+                    
+                    // Cargar portfolio
+                    const portfolioDoc = await db.collection("portfolios").doc(currentUser.uid).get();
+                    
+                    if (portfolioDoc.exists) {
+                        portfolioData = portfolioDoc.data();
+                        portfolio = portfolioData.stocks || [];
+                        portfolioName = portfolioData.name || '📈 Mi Cartera de Trading';
+                    } else {
+                        portfolioData = {
+                            name: '📈 Mi Cartera de Trading',
+                            stocks: [],
+                            createdAt: new Date().toISOString(),
+                            updatedAt: new Date().toISOString()
+                        };
+                        await this.savePortfolio([], '📈 Mi Cartera de Trading');
+                    }
+                    
+                    // Aplicar configuraciones del usuario
+                    if (userData && userData.settings) {
+                        changeTheme(userData.settings.theme || 'dark');
+                    }
+                    
+                } catch (error) {
+                    console.error('Error cargando datos del usuario:', error);
+                    userData = { settings: { theme: 'dark', currency: 'USD', notifications: true } };
+                    portfolioData = { name: '📈 Mi Cartera de Trading', stocks: [] };
+                }
+            }
+
+            async saveUserData(uid, data) {
+                await db.collection("users").doc(uid).set(data, { merge: true });
+            }
+
+            async savePortfolio(stocks, name = null) {
+                if (!currentUser) return;
+                
+                const portfolioData = {
+                    name: name || portfolioName,
+                    stocks: stocks,
+                    updatedAt: new Date().toISOString(),
+                    userId: currentUser.uid
+                };
+                
+                await db.collection("portfolios").doc(currentUser.uid).set(portfolioData, { merge: true });
+                console.log('Portfolio guardado en Firebase');
+            }
+
+            async saveUserSettings(settings) {
+                if (!currentUser) return;
+                
+                await db.collection("users").doc(currentUser.uid).update({
+                    settings: settings,
+                    updatedAt: new Date().toISOString()
+                });
+                
+                if (userData) {
+                    userData.settings = settings;
+                }
+            }
+
+            showMainApp() {
+                document.getElementById('initialLoading').style.display = 'none';
+                document.getElementById('authOverlay').style.display = 'none';
+                document.querySelector('.container').style.display = 'block';
+                
+                this.updateUserInfo();
+                document.getElementById('portfolioTitle').textContent = portfolioName;
+                initializeApp();
+            }
+
+            showAuthForm() {
+                document.getElementById('initialLoading').style.display = 'none';
+                const authOverlay = document.getElementById('authOverlay');
+                if (authOverlay) {
+                    authOverlay.style.display = 'flex';
+                }
+                document.querySelector('.container').style.display = 'none';
+            }
+
+            updateUserInfo() {
+                if (!currentUser) return;
+                
+                let userBar = document.getElementById('userBar');
+                if (!userBar) {
+                    userBar = document.createElement('div');
+                    userBar.id = 'userBar';
+                    userBar.style.cssText = `
+                        position: fixed; top: 20px; left: 20px;
+                        background: var(--glass-bg); backdrop-filter: blur(24px) saturate(180%);
+                        border: 1px solid var(--glass-border); border-radius: 20px;
+                        padding: 16px 20px; display: flex; gap: 16px; align-items: center;
+                        z-index: 100; box-shadow: 0 8px 32px var(--shadow-dark);
+                    `;
+                    document.body.appendChild(userBar);
+                }
+                
+                const displayName = currentUser.displayName || currentUser.email.split('@')[0];
+                userBar.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="
+                            width: 40px; height: 40px; background: var(--card-bg); border-radius: 50%;
+                            display: flex; align-items: center; justify-content: center; font-size: 1.2em;
+                            border: 2px solid var(--glass-border);
+                        ">👤</span>
+                        <div>
+                            <div style="color: var(--text-primary); font-weight: 700; font-size: 0.95em;">${displayName}</div>
+                            <div style="color: var(--text-secondary); font-size: 0.8em; text-transform: uppercase;">Trader</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary btn-small" onclick="logout()">🚪 Cerrar Sesión</button>
+                `;
+            }
+
+            requireAuth() {
+                if (!currentUser) {
+                    showNotification('Debes iniciar sesión para realizar esta acción', 'error');
+                    this.showAuthForm();
+                    return false;
+                }
+                return true;
+            }
+
+            getErrorMessage(error) {
+                const errorMessages = {
+                    'auth/user-not-found': 'Usuario no encontrado',
+                    'auth/wrong-password': 'Contraseña incorrecta',
+                    'auth/email-already-in-use': 'Este email ya está registrado',
+                    'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres',
+                    'auth/invalid-email': 'Email inválido',
+                    'auth/too-many-requests': 'Demasiados intentos. Inténtalo más tarde',
+                    'auth/network-request-failed': 'Error de conexión. Verifica tu internet'
+                };
+                
+                return errorMessages[error.code] || error.message || 'Error desconocido';
+            }
         }
 
-        // Configurar event listeners
-        function setupEventListeners() {
-            document.getElementById('stockForm').addEventListener('submit', handleStockSubmit);
-            document.getElementById('sortBy').addEventListener('change', renderPortfolio);
+        // Inicializar sistema de autenticación
+        const tradingAuth = new TradingAuthSystem();
 
-            window.onclick = function(event) {
-                const modal = document.getElementById('stockModal');
-                if (event.target === modal) {
-                    closeModal();
-                }
+        // Función para cerrar sesión
+        async function logout() {
+            try {
+                await auth.signOut();
+                showNotification('Sesión cerrada exitosamente', 'success');
+            } catch (error) {
+                showNotification('Error al cerrar sesión', 'error');
             }
         }
 
@@ -964,13 +1354,13 @@
         function changeTheme(theme) {
             document.body.style.opacity = '0.8';
             
-            setTimeout(() => {
+            setTimeout(async () => {
                 document.body.className = theme === 'dark' ? '' : `theme-${theme}`;
                 currentTheme = theme;
                 
                 // Guardar tema en Firebase
-                if (window.firebaseAuth && window.firebaseAuth.isAuthenticated) {
-                    window.firebaseAuth.saveUserSettings({
+                if (currentUser && tradingAuth) {
+                    await tradingAuth.saveUserSettings({
                         theme: theme,
                         currency: 'USD',
                         notifications: true
@@ -982,15 +1372,36 @@
                 });
                 
                 const themeClass = theme === 'dark' ? 'theme-dark' : `theme-${theme}-color`;
-                document.querySelector(`.${themeClass}`).classList.add('active');
+                const activeOption = document.querySelector(`.${themeClass}`);
+                if (activeOption) {
+                    activeOption.classList.add('active');
+                }
                 
                 document.body.style.opacity = '1';
             }, 200);
         }
 
+        // Función para mostrar notificaciones
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.classList.add('show'), 100);
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    if (document.body.contains(notification)) {
+                        document.body.removeChild(notification);
+                    }
+                }, 500);
+            }, 3000);
+        }
+
         // Función para editar nombre de cartera
         function editPortfolioName() {
-            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+            if (!tradingAuth.requireAuth()) return;
             
             const titleElement = document.getElementById('portfolioTitle');
             const currentName = titleElement.textContent;
@@ -1018,8 +1429,7 @@
                 const newName = input.value.trim() || currentName;
                 portfolioName = newName;
                 
-                // Guardar en Firebase
-                await window.firebaseAuth.savePortfolio(portfolio, portfolioName);
+                await tradingAuth.savePortfolio(portfolio, portfolioName);
                 
                 titleElement.textContent = newName;
                 titleElement.style.display = 'inline-block';
@@ -1033,36 +1443,36 @@
             input.select();
         }
 
-        // Función para mostrar notificaciones
-        function showNotification(message, type = 'success') {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.textContent = message;
-            document.body.appendChild(notification);
-            
-            setTimeout(() => notification.classList.add('show'), 100);
-            setTimeout(() => {
-                notification.classList.remove('show');
-                setTimeout(() => {
-                    if (document.body.contains(notification)) {
-                        document.body.removeChild(notification);
-                    }
-                }, 500);
-            }, 3000);
+        // Función para inicializar la aplicación
+        function initializeApp() {
+            setupEventListeners();
+            renderPortfolio();
         }
 
-        // Funciones de exportación e importación
+        // Configurar event listeners
+        function setupEventListeners() {
+            document.getElementById('stockForm').addEventListener('submit', handleStockSubmit);
+            document.getElementById('sortBy').addEventListener('change', renderPortfolio);
+
+            window.onclick = function(event) {
+                const modal = document.getElementById('stockModal');
+                if (event.target === modal) {
+                    closeModal();
+                }
+            }
+        }
+
+        // Función para exportar datos
         function exportData() {
-            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+            if (!tradingAuth.requireAuth()) return;
             
-            const user = window.firebaseAuth.getCurrentUser();
             const data = {
                 portfolio: portfolio,
                 portfolioName: portfolioName,
                 theme: currentTheme,
                 user: {
-                    email: user.email,
-                    displayName: user.displayName
+                    email: currentUser.email,
+                    displayName: currentUser.displayName
                 },
                 exportDate: new Date().toISOString(),
                 version: '4.0-firebase'
@@ -1082,12 +1492,12 @@
         }
 
         function importData() {
-            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+            if (!tradingAuth.requireAuth()) return;
             document.getElementById('importFile').click();
         }
 
         async function handleImport(event) {
-            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+            if (!tradingAuth.requireAuth()) return;
             
             const file = event.target.files[0];
             if (!file) return;
@@ -1103,8 +1513,7 @@
                             portfolioName = data.portfolioName || '📈 Mi Cartera de Trading';
                             currentTheme = data.theme || 'dark';
                             
-                            // Guardar en Firebase
-                            await window.firebaseAuth.savePortfolio(portfolio, portfolioName);
+                            await tradingAuth.savePortfolio(portfolio, portfolioName);
                             
                             document.getElementById('portfolioTitle').textContent = portfolioName;
                             changeTheme(currentTheme);
@@ -1126,7 +1535,7 @@
 
         // Función para abrir modal
         function openModal(stockId = null) {
-            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+            if (!tradingAuth.requireAuth()) return;
             
             currentEditingStock = stockId;
             tempPositions = [];
@@ -1226,7 +1635,7 @@
         async function handleStockSubmit(e) {
             e.preventDefault();
             
-            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+            if (!tradingAuth.requireAuth()) return;
             
             const symbol = document.getElementById('stockSymbol').value.toUpperCase();
             const currentPrice = parseFloat(document.getElementById('stockCurrentPrice').value);
@@ -1261,26 +1670,19 @@
                 showNotification(`${symbol} agregado exitosamente a tu cartera`);
             }
             
-            await savePortfolio();
+            await tradingAuth.savePortfolio(portfolio, portfolioName);
             renderPortfolio();
             closeModal();
         }
 
-        // Función para guardar portfolio en Firebase
-        async function savePortfolio() {
-            if (window.firebaseAuth && window.firebaseAuth.isAuthenticated) {
-                await window.firebaseAuth.savePortfolio(portfolio, portfolioName);
-            }
-        }
-
         // Función para eliminar acción
         async function removeStock(id) {
-            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+            if (!tradingAuth.requireAuth()) return;
             
             if (confirm('¿Estás seguro de que quieres eliminar esta acción?')) {
                 const stock = portfolio.find(s => s.id === id);
                 portfolio = portfolio.filter(stock => stock.id !== id);
-                await savePortfolio();
+                await tradingAuth.savePortfolio(portfolio, portfolioName);
                 renderPortfolio();
                 showNotification(`${stock.symbol} eliminado de tu cartera`);
             }
@@ -1288,7 +1690,7 @@
 
         // Función para actualizar precios
         async function updatePrices() {
-            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+            if (!tradingAuth.requireAuth()) return;
             
             const updateBtn = document.querySelector('button[onclick="updatePrices()"]');
             const originalText = updateBtn.textContent;
@@ -1310,7 +1712,7 @@
                     stock.currentPrice = Math.max(0.01, stock.currentPrice);
                 });
                 
-                await savePortfolio();
+                await tradingAuth.savePortfolio(portfolio, portfolioName);
                 renderPortfolio();
                 
                 updateBtn.textContent = originalText;
@@ -1477,40 +1879,21 @@
             document.getElementById('totalChange').className = `change ${pnlClass}`;
         }
 
-        // Inicializar cuando se cargue la página
-        document.addEventListener('DOMContentLoaded', function() {
-            const checkAuth = setInterval(() => {
-                if (window.firebaseAuth && window.firebaseAuth.isAuthenticated) {
-                    clearInterval(checkAuth);
-                    
-                    // Cargar datos desde Firebase
-                    if (window.firebaseAuth.portfolioData) {
-                        portfolio = window.firebaseAuth.portfolioData.stocks || [];
-                        portfolioName = window.firebaseAuth.portfolioData.name || '📈 Mi Cartera de Trading';
-                        document.getElementById('portfolioTitle').textContent = portfolioName;
-                    }
-                    
-                    // Aplicar tema del usuario
-                    if (window.firebaseAuth.userData && window.firebaseAuth.userData.settings) {
-                        changeTheme(window.firebaseAuth.userData.settings.theme || 'dark');
-                    }
-                    
-                    initializeApp();
-                }
-            }, 100);
-            
-            setTimeout(() => {
-                clearInterval(checkAuth);
-            }, 10000);
-        });
-
-        // Hacer funciones globales para compatibilidad
-        window.changeTheme = changeTheme;
-        window.portfolio = portfolio;
-        window.currentTheme = currentTheme;
-        window.renderPortfolio = renderPortfolio;
-        window.showNotification = showNotification;
-        window.portfolioName = portfolioName;
+        // Verificar si Firebase falló después de 10 segundos
+        setTimeout(() => {
+            if (!firebase.apps.length) {
+                document.getElementById('initialLoading').innerHTML = `
+                    <div style="text-align: center; color: var(--text-secondary);">
+                        <h3>Error al conectar con Firebase</h3>
+                        <p>Verifica tu configuración y conexión a internet</p>
+                        <button onclick="location.reload()" style="
+                            margin-top: 20px; padding: 10px 20px; border: none; border-radius: 8px;
+                            background: var(--glass-bg); color: var(--text-primary); cursor: pointer;
+                        ">Reintentar</button>
+                    </div>
+                `;
+            }
+        }, 10000);
     </script>
 </body>
 </html>
