@@ -18,7 +18,11 @@
         "headers": [
           {
             "key": "Content-Type",
+<<<<<<< HEAD
             "value": "application/javascript; charset=utf-8"
+=======
+            "value": "application/javascript"
+>>>>>>> 4d80f2725bb62ec4343b3eec008fdc62baea7d37
           }
         ]
       }
