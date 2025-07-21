@@ -306,6 +306,93 @@
             opacity: 0.9;
         }
 
+        .privacy-controls {
+            margin-top: 20px;
+            padding: 20px;
+            background: var(--card-bg);
+            border-radius: 16px;
+            border: 1px solid var(--glass-border);
+            text-align: center;
+            animation: fadeInUp 1.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .privacy-controls label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            color: var(--text-primary);
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 16px;
+        }
+
+        .privacy-controls input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #74b9ff;
+        }
+
+        .share-info {
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--input-bg);
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .share-url-container {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            background: var(--table-bg);
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 12px;
+        }
+
+        .share-url-container input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 0.9em;
+            outline: none;
+        }
+
+        .public-portfolio-banner {
+            background: linear-gradient(135deg, rgba(116, 185, 255, 0.2), rgba(116, 185, 255, 0.05));
+            border: 1px solid rgba(116, 185, 255, 0.3);
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin-bottom: 30px;
+            text-align: center;
+            color: var(--text-primary);
+            animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .public-portfolio-banner .banner-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .public-portfolio-banner .banner-icon {
+            font-size: 1.5em;
+        }
+
+        .public-portfolio-banner .banner-title {
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .public-portfolio-banner .banner-subtitle {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
         .portfolio-summary {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -818,6 +905,16 @@
                 width: 32px;
                 height: 32px;
             }
+
+            .share-url-container {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .public-portfolio-banner .banner-content {
+                flex-direction: column;
+                gap: 8px;
+            }
         }
     </style>
 </head>
@@ -892,7 +989,7 @@
                             <th>P&L</th>
                             <th>P&L %</th>
                             <th>Posiciones</th>
-                            <th>Acciones</th>
+                            <th id="actionsHeader">Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="portfolioTableBody">
@@ -901,8 +998,8 @@
                 </table>
                 <div id="emptyState" class="empty-state" style="display: none;">
                     <div class="empty-state-icon">📊</div>
-                    <h3>Tu cartera está vacía</h3>
-                    <p>Comienza agregando tu primera acción</p>
+                    <h3>Esta cartera está vacía</h3>
+                    <p>No hay acciones para mostrar</p>
                 </div>
             </div>
         </div>
@@ -952,7 +1049,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     
-    <!-- Sistema de autenticación Firebase -->
     <script>
         // Configuración de Firebase
         const firebaseConfig = {
@@ -970,7 +1066,7 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // Variables globales de la aplicación
+        // Variables globales
         let portfolio = [];
         let currentEditingStock = null;
         let tempPositions = [];
@@ -979,6 +1075,12 @@
         let currentUser = null;
         let userData = null;
         let portfolioData = null;
+        let isPublicView = false;
+
+        // Generar ID único para compartir
+        function generateShareId() {
+            return 'share_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+        }
 
         // Sistema de autenticación
         class TradingAuthSystem {
@@ -997,7 +1099,19 @@
                     } else {
                         console.log('Usuario no autenticado');
                         currentUser = null;
-                        this.showAuthForm();
+                        
+                        // Verificar si es una vista pública
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const shareId = urlParams.get('share');
+                        
+                        if (shareId) {
+                            isPublicView = true;
+                            document.getElementById('initialLoading').style.display = 'none';
+                            document.querySelector('.container').style.display = 'block';
+                            await loadPublicPortfolio(shareId);
+                        } else {
+                            this.showAuthForm();
+                        }
                     }
                 });
             }
@@ -1006,23 +1120,23 @@
                 if (document.getElementById('authOverlay')) return;
 
                 const authHTML = `
-                    <div id="authOverlay" class="auth-overlay" style="
+                    <div id="authOverlay" style="
                         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
                         background: var(--bg-gradient); display: flex; align-items: center;
                         justify-content: center; z-index: 2000;
                     ">
-                        <div class="auth-container" style="
+                        <div style="
                             background: var(--glass-bg); backdrop-filter: blur(40px) saturate(180%);
                             border: 1px solid var(--glass-border); border-radius: 24px;
                             padding: 40px; width: 100%; max-width: 450px;
                             box-shadow: 0 20px 60px var(--shadow-dark), inset 0 1px 0 var(--shadow-light);
                         ">
-                            <div class="auth-header" style="text-align: center; margin-bottom: 30px;">
+                            <div style="text-align: center; margin-bottom: 30px;">
                                 <h1 style="color: var(--text-primary); font-size: 2.5em; font-weight: 800; margin-bottom: 8px;">📈 Trading Portfolio</h1>
                                 <p style="color: var(--text-secondary); font-size: 1.1em;">Accede a tu cartera de inversiones</p>
                             </div>
                             
-                            <div class="auth-tabs" style="
+                            <div style="
                                 display: flex; margin-bottom: 30px; border-radius: 12px;
                                 background: var(--input-bg); padding: 4px;
                             ">
@@ -1039,7 +1153,6 @@
                                 ">Registrarse</button>
                             </div>
                             
-                            <!-- Login Form -->
                             <form id="loginForm" class="auth-form active" style="display: block;">
                                 <div class="form-group">
                                     <label for="loginEmail">Email</label>
@@ -1052,7 +1165,6 @@
                                 <button type="submit" class="btn btn-primary btn-full">Iniciar Sesión</button>
                             </form>
                             
-                            <!-- Register Form -->
                             <form id="registerForm" class="auth-form" style="display: none;">
                                 <div class="form-group">
                                     <label for="registerEmail">Email</label>
@@ -1073,7 +1185,7 @@
                                 <button type="submit" class="btn btn-primary btn-full">Registrarse</button>
                             </form>
                             
-                            <div class="auth-demo" style="
+                            <div style="
                                 margin-top: 30px; text-align: center; padding-top: 20px;
                                 border-top: 1px solid var(--table-border);
                             ">
@@ -1090,7 +1202,6 @@
             }
 
             setupAuthEvents() {
-                // Tabs
                 document.addEventListener('click', (e) => {
                     if (e.target.classList.contains('auth-tab')) {
                         this.switchTab(e.target.dataset.tab);
@@ -1099,7 +1210,6 @@
                     }
                 });
 
-                // Forms
                 document.addEventListener('submit', async (e) => {
                     if (e.target.id === 'loginForm') {
                         e.preventDefault();
@@ -1174,15 +1284,15 @@
                     const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                     await userCredential.user.updateProfile({ displayName: displayName });
                     
-                    // Crear datos iniciales
                     await this.saveUserData(userCredential.user.uid, {
                         email: email,
                         displayName: displayName,
                         settings: { theme: 'dark', currency: 'USD', notifications: true },
+                        shareId: generateShareId(),
                         createdAt: new Date().toISOString()
                     });
 
-                    await this.savePortfolio([], '📈 Mi Cartera de Trading');
+                    await savePortfolioWithPublicOption([], '📈 Mi Cartera de Trading', false);
                     showNotification('Registro exitoso. ¡Bienvenido!', 'success');
                 } catch (error) {
                     showNotification(this.getErrorMessage(error), 'error');
@@ -1196,11 +1306,19 @@
                 if (!currentUser) return;
 
                 try {
-                    // Cargar datos del usuario
                     const userDoc = await db.collection("users").doc(currentUser.uid).get();
                     userData = userDoc.exists ? userDoc.data() : null;
                     
-                    // Cargar portfolio
+                    if (!userData || !userData.shareId) {
+                        const shareId = generateShareId();
+                        userData = {
+                            ...userData,
+                            shareId: shareId,
+                            settings: userData?.settings || { theme: 'dark', currency: 'USD', notifications: true }
+                        };
+                        await this.saveUserData(currentUser.uid, userData);
+                    }
+                    
                     const portfolioDoc = await db.collection("portfolios").doc(currentUser.uid).get();
                     
                     if (portfolioDoc.exists) {
@@ -1211,40 +1329,35 @@
                         portfolioData = {
                             name: '📈 Mi Cartera de Trading',
                             stocks: [],
+                            isPublic: false,
+                            shareId: userData.shareId,
                             createdAt: new Date().toISOString(),
                             updatedAt: new Date().toISOString()
                         };
-                        await this.savePortfolio([], '📈 Mi Cartera de Trading');
+                        await savePortfolioWithPublicOption([], '📈 Mi Cartera de Trading', false);
                     }
                     
-                    // Aplicar configuraciones del usuario
                     if (userData && userData.settings) {
                         changeTheme(userData.settings.theme || 'dark');
                     }
                     
                 } catch (error) {
                     console.error('Error cargando datos del usuario:', error);
-                    userData = { settings: { theme: 'dark', currency: 'USD', notifications: true } };
-                    portfolioData = { name: '📈 Mi Cartera de Trading', stocks: [] };
+                    userData = { 
+                        shareId: generateShareId(),
+                        settings: { theme: 'dark', currency: 'USD', notifications: true } 
+                    };
+                    portfolioData = { 
+                        name: '📈 Mi Cartera de Trading', 
+                        stocks: [],
+                        isPublic: false,
+                        shareId: userData.shareId
+                    };
                 }
             }
 
             async saveUserData(uid, data) {
                 await db.collection("users").doc(uid).set(data, { merge: true });
-            }
-
-            async savePortfolio(stocks, name = null) {
-                if (!currentUser) return;
-                
-                const portfolioData = {
-                    name: name || portfolioName,
-                    stocks: stocks,
-                    updatedAt: new Date().toISOString(),
-                    userId: currentUser.uid
-                };
-                
-                await db.collection("portfolios").doc(currentUser.uid).set(portfolioData, { merge: true });
-                console.log('Portfolio guardado en Firebase');
             }
 
             async saveUserSettings(settings) {
@@ -1262,12 +1375,15 @@
 
             showMainApp() {
                 document.getElementById('initialLoading').style.display = 'none';
-                document.getElementById('authOverlay').style.display = 'none';
+                const authOverlay = document.getElementById('authOverlay');
+                if (authOverlay) {
+                    authOverlay.style.display = 'none';
+                }
                 document.querySelector('.container').style.display = 'block';
                 
                 this.updateUserInfo();
                 document.getElementById('portfolioTitle').textContent = portfolioName;
-                initializeApp();
+                initializeAppWithSharing();
             }
 
             showAuthForm() {
@@ -1340,17 +1456,246 @@
         // Inicializar sistema de autenticación
         const tradingAuth = new TradingAuthSystem();
 
-        // Función para cerrar sesión
+        // Guardar portfolio con opción pública
+        async function savePortfolioWithPublicOption(stocks, name, isPublic = false) {
+            if (!currentUser) return;
+            
+            const portfolioData = {
+                name: name || portfolioName,
+                stocks: stocks,
+                updatedAt: new Date().toISOString(),
+                userId: currentUser.uid,
+                userDisplayName: currentUser.displayName || currentUser.email.split('@')[0],
+                isPublic: isPublic,
+                shareId: userData?.shareId || generateShareId()
+            };
+            
+            if (!portfolioData.createdAt) {
+                portfolioData.createdAt = new Date().toISOString();
+            }
+            
+            await db.collection("portfolios").doc(currentUser.uid).set(portfolioData, { merge: true });
+            
+            if (isPublic) {
+                const publicPortfolioData = {
+                    name: portfolioData.name,
+                    stocks: portfolioData.stocks,
+                    updatedAt: portfolioData.updatedAt,
+                    userId: currentUser.uid,
+                    userDisplayName: portfolioData.userDisplayName,
+                    shareId: portfolioData.shareId
+                };
+                
+                await db.collection("publicPortfolios").doc(portfolioData.shareId).set(publicPortfolioData);
+            } else {
+                try {
+                    await db.collection("publicPortfolios").doc(portfolioData.shareId).delete();
+                } catch (error) {
+                    // No importa si no existe
+                }
+            }
+            
+            if (!userData) userData = {};
+            userData.shareId = portfolioData.shareId;
+            
+            console.log('Portfolio guardado. Público:', isPublic);
+            if (isPublic) {
+                console.log('Link para compartir:', `${window.location.origin}/?share=${portfolioData.shareId}`);
+            }
+        }
+
+        // Cargar portfolio público
+        async function loadPublicPortfolio(shareId) {
+            try {
+                showNotification('Cargando portfolio público...', 'success');
+                
+                const publicDoc = await db.collection("publicPortfolios").doc(shareId).get();
+                
+                if (!publicDoc.exists) {
+                    showNotification('Portfolio público no encontrado', 'error');
+                    showAuthForm();
+                    return false;
+                }
+                
+                const publicData = publicDoc.data();
+                
+                portfolio = publicData.stocks || [];
+                portfolioName = `📊 ${publicData.name} (de ${publicData.userDisplayName})`;
+                
+                document.getElementById('portfolioTitle').textContent = portfolioName;
+                document.getElementById('portfolioTitle').style.cursor = 'default';
+                document.getElementById('portfolioTitle').onclick = null;
+                
+                hideEditControls();
+                showPublicPortfolioBanner(publicData.userDisplayName);
+                renderPortfolio();
+                
+                return true;
+            } catch (error) {
+                console.error('Error cargando portfolio público:', error);
+                showNotification('Error cargando portfolio público', 'error');
+                showAuthForm();
+                return false;
+            }
+        }
+
+        // Ocultar controles de edición en modo público
+        function hideEditControls() {
+            const controls = document.querySelector('.controls');
+            if (controls) {
+                controls.style.display = 'none';
+            }
+            
+            const actionHeader = document.getElementById('actionsHeader');
+            if (actionHeader) {
+                actionHeader.style.display = 'none';
+            }
+        }
+
+        // Mostrar banner de portfolio público
+        function showPublicPortfolioBanner(ownerName) {
+            const banner = document.createElement('div');
+            banner.className = 'public-portfolio-banner';
+            
+            banner.innerHTML = `
+                <div class="banner-content">
+                    <span class="banner-icon">👁️</span>
+                    <div>
+                        <div class="banner-title">
+                            Estás viendo el portfolio público de ${ownerName}
+                        </div>
+                        <div class="banner-subtitle">
+                            Esta es una vista de solo lectura
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            const container = document.querySelector('.main-container');
+            const header = document.querySelector('.header');
+            container.insertBefore(banner, header.nextSibling);
+        }
+
+        // Mostrar formulario de auth
+        function showAuthForm() {
+            const authOverlay = document.getElementById('authOverlay');
+            if (authOverlay) {
+                authOverlay.style.display = 'flex';
+            }
+            document.querySelector('.container').style.display = 'none';
+        }
+
+        // Crear controles de privacidad
+        function createPrivacyControls() {
+            if (isPublicView || document.getElementById('privacyControls')) return;
+            
+            const header = document.querySelector('.header');
+            
+            const privacyControls = document.createElement('div');
+            privacyControls.id = 'privacyControls';
+            privacyControls.className = 'privacy-controls';
+            
+            privacyControls.innerHTML = `
+                <label>
+                    <input type="checkbox" id="portfolioPublic">
+                    <span>📤 Hacer mi cartera pública</span>
+                </label>
+                <div id="shareInfo" class="share-info" style="display: none;">
+                    <p style="color: var(--text-secondary); margin-bottom: 12px;">
+                        Tu cartera es pública. Comparte este enlace:
+                    </p>
+                    <div class="share-url-container">
+                        <input type="text" id="shareUrl" readonly>
+                        <button onclick="copyShareUrl()" class="btn btn-secondary btn-small">
+                            📋 Copiar
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            header.appendChild(privacyControls);
+            
+            document.getElementById('portfolioPublic').addEventListener('change', async (e) => {
+                const isPublic = e.target.checked;
+                await savePortfolioWithPublicOption(portfolio, portfolioName, isPublic);
+                updateShareInfo(isPublic);
+                
+                showNotification(
+                    isPublic ? 'Portfolio ahora es público' : 'Portfolio ahora es privado',
+                    'success'
+                );
+            });
+        }
+
+        // Actualizar info de compartir
+        function updateShareInfo(isPublic) {
+            const shareInfo = document.getElementById('shareInfo');
+            const shareUrl = document.getElementById('shareUrl');
+            
+            if (isPublic && userData?.shareId) {
+                const url = `${window.location.origin}/?share=${userData.shareId}`;
+                shareUrl.value = url;
+                shareInfo.style.display = 'block';
+            } else {
+                shareInfo.style.display = 'none';
+            }
+        }
+
+        // Copiar URL
+        function copyShareUrl() {
+            const shareUrl = document.getElementById('shareUrl');
+            shareUrl.select();
+            document.execCommand('copy');
+            showNotification('¡Enlace copiado al portapapeles!', 'success');
+        }
+
+        // Verificar privacidad actual
+        async function checkCurrentPortfolioPrivacy() {
+            if (!currentUser || isPublicView) return;
+            
+            try {
+                const portfolioDoc = await db.collection("portfolios").doc(currentUser.uid).get();
+                if (portfolioDoc.exists) {
+                    const data = portfolioDoc.data();
+                    const isPublic = data.isPublic || false;
+                    
+                    const checkbox = document.getElementById('portfolioPublic');
+                    if (checkbox) {
+                        checkbox.checked = isPublic;
+                        updateShareInfo(isPublic);
+                    }
+                }
+            } catch (error) {
+                console.error('Error verificando privacidad:', error);
+            }
+        }
+
+        // Inicializar la aplicación con compartir
+        function initializeAppWithSharing() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const shareId = urlParams.get('share');
+            
+            if (shareId && !currentUser) {
+                return;
+            } else if (!isPublicView) {
+                setupEventListeners();
+                renderPortfolio();
+                createPrivacyControls();
+                setTimeout(checkCurrentPortfolioPrivacy, 1000);
+            }
+        }
+
+        // Funciones principales
         async function logout() {
             try {
                 await auth.signOut();
                 showNotification('Sesión cerrada exitosamente', 'success');
+                window.history.replaceState({}, document.title, window.location.pathname);
             } catch (error) {
                 showNotification('Error al cerrar sesión', 'error');
             }
         }
 
-        // Función para cambiar tema
         function changeTheme(theme) {
             document.body.style.opacity = '0.8';
             
@@ -1358,7 +1703,6 @@
                 document.body.className = theme === 'dark' ? '' : `theme-${theme}`;
                 currentTheme = theme;
                 
-                // Guardar tema en Firebase
                 if (currentUser && tradingAuth) {
                     await tradingAuth.saveUserSettings({
                         theme: theme,
@@ -1381,7 +1725,6 @@
             }, 200);
         }
 
-        // Función para mostrar notificaciones
         function showNotification(message, type = 'success') {
             const notification = document.createElement('div');
             notification.className = `notification ${type}`;
@@ -1399,9 +1742,8 @@
             }, 3000);
         }
 
-        // Función para editar nombre de cartera
         function editPortfolioName() {
-            if (!tradingAuth.requireAuth()) return;
+            if (isPublicView || !tradingAuth.requireAuth()) return;
             
             const titleElement = document.getElementById('portfolioTitle');
             const currentName = titleElement.textContent;
@@ -1429,7 +1771,8 @@
                 const newName = input.value.trim() || currentName;
                 portfolioName = newName;
                 
-                await tradingAuth.savePortfolio(portfolio, portfolioName);
+                const isPublic = document.getElementById('portfolioPublic')?.checked || false;
+                await savePortfolioWithPublicOption(portfolio, portfolioName, isPublic);
                 
                 titleElement.textContent = newName;
                 titleElement.style.display = 'inline-block';
@@ -1443,14 +1786,9 @@
             input.select();
         }
 
-        // Función para inicializar la aplicación
-        function initializeApp() {
-            setupEventListeners();
-            renderPortfolio();
-        }
-
-        // Configurar event listeners
         function setupEventListeners() {
+            if (isPublicView) return;
+            
             document.getElementById('stockForm').addEventListener('submit', handleStockSubmit);
             document.getElementById('sortBy').addEventListener('change', renderPortfolio);
 
@@ -1462,7 +1800,6 @@
             }
         }
 
-        // Función para exportar datos
         function exportData() {
             if (!tradingAuth.requireAuth()) return;
             
@@ -1474,8 +1811,9 @@
                     email: currentUser.email,
                     displayName: currentUser.displayName
                 },
+                shareId: userData?.shareId,
                 exportDate: new Date().toISOString(),
-                version: '4.0-firebase'
+                version: '4.1-firebase-sharing'
             };
             
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1513,7 +1851,8 @@
                             portfolioName = data.portfolioName || '📈 Mi Cartera de Trading';
                             currentTheme = data.theme || 'dark';
                             
-                            await tradingAuth.savePortfolio(portfolio, portfolioName);
+                            const isPublic = document.getElementById('portfolioPublic')?.checked || false;
+                            await savePortfolioWithPublicOption(portfolio, portfolioName, isPublic);
                             
                             document.getElementById('portfolioTitle').textContent = portfolioName;
                             changeTheme(currentTheme);
@@ -1533,9 +1872,8 @@
             event.target.value = '';
         }
 
-        // Función para abrir modal
         function openModal(stockId = null) {
-            if (!tradingAuth.requireAuth()) return;
+            if (isPublicView || !tradingAuth.requireAuth()) return;
             
             currentEditingStock = stockId;
             tempPositions = [];
@@ -1560,7 +1898,6 @@
             document.getElementById('stockModal').style.display = 'block';
         }
 
-        // Función para cerrar modal
         function closeModal() {
             document.getElementById('stockModal').style.display = 'none';
             document.getElementById('stockForm').reset();
@@ -1568,7 +1905,6 @@
             tempPositions = [];
         }
 
-        // Función para agregar posición
         function addPosition() {
             const shares = parseInt(document.getElementById('stockShares').value);
             const price = parseFloat(document.getElementById('stockPurchasePrice').value);
@@ -1590,13 +1926,11 @@
             renderPositions();
         }
 
-        // Función para eliminar posición
         function removePosition(positionId) {
             tempPositions = tempPositions.filter(pos => pos.id !== positionId);
             renderPositions();
         }
 
-        // Función para renderizar posiciones
         function renderPositions() {
             const container = document.getElementById('positionsContainer');
             
@@ -1631,7 +1965,6 @@
             `;
         }
 
-        // Función para manejar envío del formulario
         async function handleStockSubmit(e) {
             e.preventDefault();
             
@@ -1670,27 +2003,28 @@
                 showNotification(`${symbol} agregado exitosamente a tu cartera`);
             }
             
-            await tradingAuth.savePortfolio(portfolio, portfolioName);
+            const isPublic = document.getElementById('portfolioPublic')?.checked || false;
+            await savePortfolioWithPublicOption(portfolio, portfolioName, isPublic);
             renderPortfolio();
             closeModal();
         }
 
-        // Función para eliminar acción
         async function removeStock(id) {
-            if (!tradingAuth.requireAuth()) return;
+            if (isPublicView || !tradingAuth.requireAuth()) return;
             
             if (confirm('¿Estás seguro de que quieres eliminar esta acción?')) {
                 const stock = portfolio.find(s => s.id === id);
                 portfolio = portfolio.filter(stock => stock.id !== id);
-                await tradingAuth.savePortfolio(portfolio, portfolioName);
+                
+                const isPublic = document.getElementById('portfolioPublic')?.checked || false;
+                await savePortfolioWithPublicOption(portfolio, portfolioName, isPublic);
                 renderPortfolio();
                 showNotification(`${stock.symbol} eliminado de tu cartera`);
             }
         }
 
-        // Función para actualizar precios
         async function updatePrices() {
-            if (!tradingAuth.requireAuth()) return;
+            if (isPublicView || !tradingAuth.requireAuth()) return;
             
             const updateBtn = document.querySelector('button[onclick="updatePrices()"]');
             const originalText = updateBtn.textContent;
@@ -1712,7 +2046,8 @@
                     stock.currentPrice = Math.max(0.01, stock.currentPrice);
                 });
                 
-                await tradingAuth.savePortfolio(portfolio, portfolioName);
+                const isPublic = document.getElementById('portfolioPublic')?.checked || false;
+                await savePortfolioWithPublicOption(portfolio, portfolioName, isPublic);
                 renderPortfolio();
                 
                 updateBtn.textContent = originalText;
@@ -1722,7 +2057,6 @@
             }, 1000);
         }
 
-        // Función para filtrar acciones
         function filterStocks() {
             const searchTerm = document.getElementById('searchStock').value.toLowerCase();
             const rows = document.querySelectorAll('#portfolioTableBody tr');
@@ -1737,7 +2071,6 @@
             });
         }
 
-        // Función para calcular estadísticas
         function calculateStockStats(stock) {
             const totalShares = stock.positions.reduce((sum, pos) => sum + pos.shares, 0);
             const totalCost = stock.positions.reduce((sum, pos) => sum + (pos.shares * pos.price), 0);
@@ -1756,7 +2089,6 @@
             };
         }
 
-        // Función para renderizar portfolio
         function renderPortfolio() {
             const tableBody = document.getElementById('portfolioTableBody');
             const emptyState = document.getElementById('emptyState');
@@ -1807,6 +2139,16 @@
                 
                 const row = document.createElement('tr');
                 row.style.animationDelay = `${index * 0.1}s`;
+                
+                const actionsColumn = isPublicView ? '' : `
+                    <td>
+                        <div class="actions-cell">
+                            <button class="btn btn-edit btn-icon" onclick="openModal(${stock.id})" title="Editar acción">✏️</button>
+                            <button class="btn btn-danger btn-icon" onclick="removeStock(${stock.id})" title="Eliminar acción">🗑️</button>
+                        </div>
+                    </td>
+                `;
+                
                 row.innerHTML = `
                     <td>
                         <div class="stock-symbol">${stock.symbol}</div>
@@ -1837,12 +2179,7 @@
                             📊 ${stock.positions.length} posición${stock.positions.length !== 1 ? 'es' : ''}
                         </div>
                     </td>
-                    <td>
-                        <div class="actions-cell">
-                            <button class="btn btn-edit btn-icon" onclick="openModal(${stock.id})" title="Editar acción">✏️</button>
-                            <button class="btn btn-danger btn-icon" onclick="removeStock(${stock.id})" title="Eliminar acción">🗑️</button>
-                        </div>
-                    </td>
+                    ${actionsColumn}
                 `;
                 tableBody.appendChild(row);
             });
@@ -1850,7 +2187,6 @@
             updateSummary();
         }
 
-        // Función para actualizar resumen
         function updateSummary() {
             let totalValue = 0;
             let totalCost = 0;
