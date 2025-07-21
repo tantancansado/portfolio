@@ -765,6 +765,29 @@
             opacity: 0.5;
         }
 
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .loading-spinner::after {
+            content: '';
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--glass-border);
+            border-top: 3px solid var(--text-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
         @media (max-width: 768px) {
             .main-container {
                 padding: 24px;
@@ -806,6 +829,11 @@
     </style>
 </head>
 <body>
+    <!-- Loading inicial -->
+    <div id="initialLoading" class="loading-spinner">
+        Inicializando Firebase...
+    </div>
+
     <div class="theme-selector">
         <span class="theme-label">Tema:</span>
         <div class="theme-option theme-dark active" onclick="changeTheme('dark')" title="Oscuro"></div>
@@ -926,10 +954,11 @@
         </div>
     </div>
 
-    <!-- Cargar sistema de autenticación Firebase -->
-    <script type="module" src="./firebase-auth.js"></script>
-    
-    <script>
+    <!-- Script principal -->
+    <script type="module">
+        // Importar Firebase Auth
+        import firebaseAuth from './firebase-auth.js';
+
         // Variables globales
         let portfolio = [];
         let currentEditingStock = null;
@@ -937,12 +966,30 @@
         let portfolioName = '📈 Mi Cartera de Trading';
         let currentTheme = 'dark';
 
-        // Función para inicializar la aplicación
-        function initializeApp() {
-            if (!window.firebaseAuth || !window.firebaseAuth.isAuthenticated) {
-                return;
+        // Ocultar loading inicial cuando Firebase esté listo
+        window.addEventListener('firebaseAuthReady', (event) => {
+            document.getElementById('initialLoading').style.display = 'none';
+            
+            const { userData, portfolioData } = event.detail;
+            
+            // Cargar datos del usuario
+            if (portfolioData) {
+                portfolio = portfolioData.stocks || [];
+                portfolioName = portfolioData.name || '📈 Mi Cartera de Trading';
+                document.getElementById('portfolioTitle').textContent = portfolioName;
             }
             
+            // Aplicar tema del usuario
+            if (userData && userData.settings) {
+                changeTheme(userData.settings.theme || 'dark');
+            }
+            
+            // Inicializar aplicación
+            initializeApp();
+        });
+
+        // Función para inicializar la aplicación
+        function initializeApp() {
             setupEventListeners();
             renderPortfolio();
         }
@@ -961,16 +1008,16 @@
         }
 
         // Función para cambiar tema
-        function changeTheme(theme) {
+        window.changeTheme = function(theme) {
             document.body.style.opacity = '0.8';
             
-            setTimeout(() => {
+            setTimeout(async () => {
                 document.body.className = theme === 'dark' ? '' : `theme-${theme}`;
                 currentTheme = theme;
                 
                 // Guardar tema en Firebase
-                if (window.firebaseAuth && window.firebaseAuth.isAuthenticated) {
-                    window.firebaseAuth.saveUserSettings({
+                if (firebaseAuth && firebaseAuth.isAuthenticated) {
+                    await firebaseAuth.saveUserSettings({
                         theme: theme,
                         currency: 'USD',
                         notifications: true
@@ -989,8 +1036,8 @@
         }
 
         // Función para editar nombre de cartera
-        function editPortfolioName() {
-            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+        window.editPortfolioName = function() {
+            if (!firebaseAuth || !firebaseAuth.requireAuth()) return;
             
             const titleElement = document.getElementById('portfolioTitle');
             const currentName = titleElement.textContent;
@@ -1019,7 +1066,7 @@
                 portfolioName = newName;
                 
                 // Guardar en Firebase
-                await window.firebaseAuth.savePortfolio(portfolio, portfolioName);
+                await firebaseAuth.savePortfolio(portfolio, portfolioName);
                 
                 titleElement.textContent = newName;
                 titleElement.style.display = 'inline-block';
@@ -1034,7 +1081,7 @@
         }
 
         // Función para mostrar notificaciones
-        function showNotification(message, type = 'success') {
+        window.showNotification = function(message, type = 'success') {
             const notification = document.createElement('div');
             notification.className = `notification ${type}`;
             notification.textContent = message;
@@ -1052,10 +1099,10 @@
         }
 
         // Funciones de exportación e importación
-        function exportData() {
-            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+        window.exportData = function() {
+            if (!firebaseAuth || !firebaseAuth.requireAuth()) return;
             
-            const user = window.firebaseAuth.getCurrentUser();
+            const user = firebaseAuth.getCurrentUser();
             const data = {
                 portfolio: portfolio,
                 portfolioName: portfolioName,
@@ -1081,13 +1128,13 @@
             showNotification('Datos exportados exitosamente');
         }
 
-        function importData() {
-            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+        window.importData = function() {
+            if (!firebaseAuth || !firebaseAuth.requireAuth()) return;
             document.getElementById('importFile').click();
         }
 
-        async function handleImport(event) {
-            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+        window.handleImport = async function(event) {
+            if (!firebaseAuth || !firebaseAuth.requireAuth()) return;
             
             const file = event.target.files[0];
             if (!file) return;
@@ -1104,7 +1151,7 @@
                             currentTheme = data.theme || 'dark';
                             
                             // Guardar en Firebase
-                            await window.firebaseAuth.savePortfolio(portfolio, portfolioName);
+                            await firebaseAuth.savePortfolio(portfolio, portfolioName);
                             
                             document.getElementById('portfolioTitle').textContent = portfolioName;
                             changeTheme(currentTheme);
@@ -1125,8 +1172,8 @@
         }
 
         // Función para abrir modal
-        function openModal(stockId = null) {
-            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+        window.openModal = function(stockId = null) {
+            if (!firebaseAuth || !firebaseAuth.requireAuth()) return;
             
             currentEditingStock = stockId;
             tempPositions = [];
@@ -1152,7 +1199,7 @@
         }
 
         // Función para cerrar modal
-        function closeModal() {
+        window.closeModal = function() {
             document.getElementById('stockModal').style.display = 'none';
             document.getElementById('stockForm').reset();
             currentEditingStock = null;
@@ -1160,7 +1207,7 @@
         }
 
         // Función para agregar posición
-        function addPosition() {
+        window.addPosition = function() {
             const shares = parseInt(document.getElementById('stockShares').value);
             const price = parseFloat(document.getElementById('stockPurchasePrice').value);
             
@@ -1182,7 +1229,7 @@
         }
 
         // Función para eliminar posición
-        function removePosition(positionId) {
+        window.removePosition = function(positionId) {
             tempPositions = tempPositions.filter(pos => pos.id !== positionId);
             renderPositions();
         }
@@ -1226,7 +1273,7 @@
         async function handleStockSubmit(e) {
             e.preventDefault();
             
-            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+            if (!firebaseAuth || !firebaseAuth.requireAuth()) return;
             
             const symbol = document.getElementById('stockSymbol').value.toUpperCase();
             const currentPrice = parseFloat(document.getElementById('stockCurrentPrice').value);
@@ -1268,14 +1315,14 @@
 
         // Función para guardar portfolio en Firebase
         async function savePortfolio() {
-            if (window.firebaseAuth && window.firebaseAuth.isAuthenticated) {
-                await window.firebaseAuth.savePortfolio(portfolio, portfolioName);
+            if (firebaseAuth && firebaseAuth.isAuthenticated) {
+                await firebaseAuth.savePortfolio(portfolio, portfolioName);
             }
         }
 
         // Función para eliminar acción
-        async function removeStock(id) {
-            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+        window.removeStock = async function(id) {
+            if (!firebaseAuth || !firebaseAuth.requireAuth()) return;
             
             if (confirm('¿Estás seguro de que quieres eliminar esta acción?')) {
                 const stock = portfolio.find(s => s.id === id);
@@ -1287,8 +1334,8 @@
         }
 
         // Función para actualizar precios
-        async function updatePrices() {
-            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+        window.updatePrices = async function() {
+            if (!firebaseAuth || !firebaseAuth.requireAuth()) return;
             
             const updateBtn = document.querySelector('button[onclick="updatePrices()"]');
             const originalText = updateBtn.textContent;
@@ -1321,7 +1368,7 @@
         }
 
         // Función para filtrar acciones
-        function filterStocks() {
+        window.filterStocks = function() {
             const searchTerm = document.getElementById('searchStock').value.toLowerCase();
             const rows = document.querySelectorAll('#portfolioTableBody tr');
             
@@ -1477,39 +1524,23 @@
             document.getElementById('totalChange').className = `change ${pnlClass}`;
         }
 
-        // Inicializar cuando se cargue la página
-        document.addEventListener('DOMContentLoaded', function() {
-            const checkAuth = setInterval(() => {
-                if (window.firebaseAuth && window.firebaseAuth.isAuthenticated) {
-                    clearInterval(checkAuth);
-                    
-                    // Cargar datos desde Firebase
-                    if (window.firebaseAuth.portfolioData) {
-                        portfolio = window.firebaseAuth.portfolioData.stocks || [];
-                        portfolioName = window.firebaseAuth.portfolioData.name || '📈 Mi Cartera de Trading';
-                        document.getElementById('portfolioTitle').textContent = portfolioName;
-                    }
-                    
-                    // Aplicar tema del usuario
-                    if (window.firebaseAuth.userData && window.firebaseAuth.userData.settings) {
-                        changeTheme(window.firebaseAuth.userData.settings.theme || 'dark');
-                    }
-                    
-                    initializeApp();
-                }
-            }, 100);
-            
-            setTimeout(() => {
-                clearInterval(checkAuth);
-            }, 10000);
-        });
+        // Verificar si Firebase falló y mostrar fallback
+        setTimeout(() => {
+            if (!firebaseAuth || !firebaseAuth.app) {
+                document.getElementById('initialLoading').innerHTML = `
+                    <div style="text-align: center; color: var(--text-secondary);">
+                        <h3>Error al conectar con Firebase</h3>
+                        <p>Verifica tu configuración y conexión a internet</p>
+                        <button class="btn btn-secondary" onclick="location.reload()">Reintentar</button>
+                    </div>
+                `;
+            }
+        }, 10000);
 
-        // Hacer funciones globales para compatibilidad
-        window.changeTheme = changeTheme;
+        // Hacer funciones globales disponibles
         window.portfolio = portfolio;
         window.currentTheme = currentTheme;
         window.renderPortfolio = renderPortfolio;
-        window.showNotification = showNotification;
         window.portfolioName = portfolioName;
     </script>
 </body>
