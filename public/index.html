@@ -938,8 +938,7 @@
     <div class="container">
         <div class="main-container">
             <div class="header">
-                <div class="portfolio-title" id="portfolioTitle" onclick="editPortfolioName()">📈 Mi Cartera de Trading</div>
-                <p class="subtitle">Gestiona tu portafolio de inversiones con elegancia</p>
+                <div class="portfolio-title" id="portfolioTitle" onclick="editPortfolioName()">📈 Mi Cartera de Trading</div>                
             </div>
 
             <div class="portfolio-summary">
@@ -965,6 +964,7 @@
                 <button class="btn btn-secondary" onclick="updatePrices()">🔄 Actualizar Precios</button>
                 <button class="btn btn-success" onclick="exportData()">📤 Exportar Datos</button>
                 <button class="btn btn-edit" onclick="importData()">📥 Importar Datos</button>
+                <button class="btn btn-edit" onclick="sharePortfolio()">🔗 Compartir Portfolio</button>
                 <input type="file" id="importFile" accept=".json" style="display: none;" onchange="handleImport(event)">
                 <div class="input-group">
                     <select id="sortBy">
@@ -2186,6 +2186,30 @@
             
             updateSummary();
         }
+        async function sharePortfolio() {
+    if (!tradingAuth.requireAuth()) return;
+    
+    const isCurrentlyPublic = portfolioData?.isPublic || false;
+    const newState = !isCurrentlyPublic;
+    
+    if (confirm(`¿Quieres ${newState ? 'hacer público' : 'hacer privado'} tu portfolio?`)) {
+        await savePortfolioWithPublicOption(portfolio, portfolioName, newState);
+        
+        if (newState && userData?.shareId) {
+            const url = `${window.location.origin}/?share=${userData.shareId}`;
+            
+            try {
+                await navigator.clipboard.writeText(url);
+                showNotification(`🎉 Portfolio público! Enlace copiado al portapapeles`, 'success');
+                alert(`Enlace para compartir:\n${url}`);
+            } catch (err) {
+                prompt('Copia este enlace para compartir tu portfolio:', url);
+            }
+        } else {
+            showNotification('🔒 Portfolio ahora es privado', 'success');
+        }
+    }
+}
 
         function updateSummary() {
             let totalValue = 0;
