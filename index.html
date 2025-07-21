@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cartera de Trading</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            --text-primary: rgba(255, 255, 255, 0.95);
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --text-muted: rgba(255, 255, 255, 0.6);
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --card-bg: rgba(255, 255, 255, 0.1);
+            --table-bg: rgba(255, 255, 255, 0.05);
+            --table-border: rgba(255, 255, 255, 0.1);
+            --table-hover: rgba(255, 255, 255, 0.08);
+            --input-bg: rgba(255, 255, 255, 0.1);
+            --input-border: rgba(255, 255, 255, 0.2);
+            --shadow-light: rgba(255, 255, 255, 0.1);
+            --shadow-dark: rgba(0, 0, 0, 0.2);
+        }
+
+        body.theme-ocean {
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #4facfe 100%);
+            --glass-bg: rgba(255, 255, 255, 0.12);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --table-hover: rgba(255, 255, 255, 0.12);
+        }
+
+        body.theme-sunset {
+            --bg-gradient: linear-gradient(135deg, #ff7e5f 0%, #feb47b 50%, #ff6b6b 100%);
+            --text-primary: rgba(255, 255, 255, 0.98);
+            --text-secondary: rgba(255, 255, 255, 0.85);
+            --glass-bg: rgba(255, 255, 255, 0.15);
+            --glass-border: rgba(255, 255, 255, 0.25);
+        }
+
+        body.theme-forest {
+            --bg-gradient: linear-gradient(135deg, #134e5e 0%, #71b280 50%, #2d5016 100%);
+            --glass-bg: rgba(255, 255, 255, 0.12);
+            --glass-border: rgba(255, 255, 255, 0.2);
+        }
+
+        body.theme-aurora {
+            --bg-gradient: linear-gradient(135deg, #a8edea 0%, #fed6e3 50%, #d299c2 100%);
+            --text-primary: rgba(60, 60, 60, 0.95);
+            --text-secondary: rgba(80, 80, 80, 0.85);
+            --text-muted: rgba(100, 100, 100, 0.75);
+            --glass-bg: rgba(255, 255, 255, 0.3);
+            --glass-border: rgba(255, 255, 255, 0.4);
+            --table-bg: rgba(255, 255, 255, 0.2);
+            --table-hover: rgba(255, 255, 255, 0.25);
+        }
+
+        body.theme-galaxy {
+            --bg-gradient: linear-gradient(135deg, #2c3e50 0%, #3498db 50%, #9b59b6 100%);
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.18);
+        }
+
+        body.theme-minimal {
+            --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 50%, #667eea 100%);
+            --text-primary: rgba(50, 50, 50, 0.95);
+            --text-secondary: rgba(70, 70, 70, 0.85);
+            --text-muted: rgba(90, 90, 90, 0.75);
+            --glass-bg: rgba(255, 255, 255, 0.5);
+            --glass-border: rgba(255, 255, 255, 0.6);
+            --table-bg: rgba(255, 255, 255, 0.3);
+            --table-hover: rgba(255, 255, 255, 0.4);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            padding: 20px;
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow-x: hidden;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .theme-selector {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 16px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            z-index: 100;
+            animation: slideInRight 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 8px 32px var(--shadow-dark);
+        }
+
+        .theme-label {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        .theme-option {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .theme-option::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            transform: translate(-50%, -50%);
+        }
+
+        .theme-option:hover::before {
+            width: 100%;
+            height: 100%;
+        }
+
+        .theme-option:hover {
+            transform: scale(1.15);
+            border-color: var(--glass-border);
+        }
+
+        .theme-option.active {
+            border-color: #74b9ff;
+            box-shadow: 0 0 0 3px rgba(116, 185, 255, 0.3);
+            transform: scale(1.1);
+        }
+
+        .theme-dark { background: linear-gradient(135deg, #1a1a2e, #16213e); }
+        .theme-ocean-color { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .theme-sunset-color { background: linear-gradient(135deg, #ff7e5f, #feb47b); }
+        .theme-forest-color { background: linear-gradient(135deg, #134e5e, #71b280); }
+        .theme-aurora-color { background: linear-gradient(135deg, #a8edea, #fed6e3); }
+        .theme-galaxy-color { background: linear-gradient(135deg, #2c3e50, #3498db); }
+        .theme-minimal-color { background: linear-gradient(135deg, #f5f7fa, #c3cfe2); }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            animation: fadeInUp 1s cubic-bezier(0.4, 0, 0.2, 1);
+            display: none;
+        }
+
+        .main-container {
+            background: var(--glass-bg);
+            backdrop-filter: blur(40px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 
+                0 20px 60px var(--shadow-dark),
+                0 8px 32px rgba(0, 0, 0, 0.12),
+                inset 0 1px 0 var(--shadow-light);
+            animation: scaleIn 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            animation: fadeInUp 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .portfolio-title {
+            color: var(--text-primary);
+            font-size: 3.2em;
+            font-weight: 800;
+            margin-bottom: 12px;
+            cursor: pointer;
+            padding: 12px 20px;
+            border-radius: 16px;
+            display: inline-block;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background: linear-gradient(135deg, transparent, var(--glass-bg));
+            position: relative;
+            overflow: hidden;
+        }
+
+        .portfolio-title::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, var(--shadow-light), transparent);
+            transition: left 0.6s ease;
+        }
+
+        .portfolio-title:hover::before {
+            left: 100%;
+        }
+
+        .portfolio-title:hover {
+            background: var(--input-bg);
+            transform: scale(1.05) translateY(-4px);
+            box-shadow: 0 12px 32px var(--shadow-dark);
+        }
+
+        .portfolio-title-input {
+            background: var(--input-bg);
+            border: 2px solid var(--glass-border);
+            border-radius: 16px;
+            color: var(--text-primary);
+            font-size: 3.2em;
+            font-weight: 800;
+            text-align: center;
+            padding: 12px 20px;
+            outline: none;
+            max-width: 700px;
+            width: 100%;
+            backdrop-filter: blur(20px);
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.2em;
+            font-weight: 500;
+            opacity: 0.9;
+        }
+
+        .portfolio-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+
+        .summary-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(24px) saturate(150%);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 32px;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            animation: fadeInUp 1.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .summary-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, var(--shadow-light), transparent);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-12px) scale(1.02);
+            box-shadow: 
+                0 25px 80px var(--shadow-dark),
+                0 12px 40px rgba(0, 0, 0, 0.15);
+            border-color: var(--glass-border);
+        }
+
+        .summary-card:hover::before {
+            opacity: 1;
+        }
+
+        .summary-card h3 {
+            color: var(--text-secondary);
+            font-size: 0.95em;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 700;
+        }
+
+        .summary-card .value {
+            color: var(--text-primary);
+            font-size: 2.8em;
+            font-weight: 900;
+            margin-bottom: 12px;
+            line-height: 1;
+        }
+
+        .summary-card .change {
+            color: var(--text-secondary);
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+
+        .positive { 
+            color: #10b981 !important; 
+            text-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+        }
+        .negative { 
+            color: #ef4444 !important; 
+            text-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+            align-items: center;
+            animation: fadeInUp 1.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn {
+            padding: 16px 32px;
+            border: none;
+            border-radius: 16px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            color: var(--text-primary);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            position: relative;
+            overflow: hidden;
+            text-transform: none;
+            letter-spacing: 0.5px;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            transition: all 0.4s ease;
+            transform: translate(-50%, -50%);
+        }
+
+        .btn:hover::before {
+            width: 200%;
+            height: 200%;
+        }
+
+        .btn:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 32px var(--shadow-dark);
+        }
+
+        .btn-primary { background: linear-gradient(135deg, rgba(116, 185, 255, 0.3), rgba(116, 185, 255, 0.1)); }
+        .btn-secondary { background: linear-gradient(135deg, rgba(253, 121, 168, 0.3), rgba(253, 121, 168, 0.1)); }
+        .btn-success { background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(16, 185, 129, 0.1)); }
+        .btn-danger { background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(239, 68, 68, 0.1)); }
+        .btn-edit { background: linear-gradient(135deg, rgba(251, 191, 36, 0.3), rgba(251, 191, 36, 0.1)); }
+        .btn-small { padding: 12px 24px; font-size: 0.9em; }
+
+        .input-group {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .input-group input, .input-group select {
+            padding: 16px 24px;
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            font-size: 1em;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(20px);
+        }
+
+        .input-group input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .input-group input:focus, .input-group select:focus {
+            outline: none;
+            border-color: #74b9ff;
+            box-shadow: 0 0 0 4px rgba(116, 185, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .portfolio-table-container {
+            background: var(--table-bg);
+            backdrop-filter: blur(24px);
+            border: 1px solid var(--table-border);
+            border-radius: 20px;
+            overflow: hidden;
+            animation: fadeInUp 1.8s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 8px 32px var(--shadow-dark);
+        }
+
+        .portfolio-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95em;
+        }
+
+        .portfolio-table thead {
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+        }
+
+        .portfolio-table th {
+            padding: 20px 24px;
+            text-align: left;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.8em;
+            border-bottom: 1px solid var(--table-border);
+            position: relative;
+        }
+
+        .portfolio-table th:hover {
+            background: var(--table-hover);
+        }
+
+        .portfolio-table tbody tr {
+            border-bottom: 1px solid var(--table-border);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .portfolio-table tbody tr:hover {
+            background: var(--table-hover);
+            transform: scale(1.01);
+            box-shadow: 0 4px 20px var(--shadow-dark);
+        }
+
+        .portfolio-table td {
+            padding: 20px 24px;
+            color: var(--text-primary);
+            font-weight: 500;
+            vertical-align: middle;
+        }
+
+        .stock-symbol {
+            font-weight: 800;
+            font-size: 1.1em;
+            color: var(--text-primary);
+        }
+
+        .stock-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: var(--input-bg);
+            border-radius: 8px;
+            font-size: 0.85em;
+            font-weight: 600;
+            border: 1px solid var(--glass-border);
+        }
+
+        .progress-mini {
+            width: 60px;
+            height: 6px;
+            background: var(--table-border);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .progress-mini-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #74b9ff, #0984e3);
+            border-radius: 3px;
+            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .actions-cell {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9em;
+            padding: 0;
+            transition: all 0.3s ease;
+        }
+
+        .btn-icon:hover {
+            transform: scale(1.1);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(12px);
+            z-index: 1000;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--glass-bg);
+            backdrop-filter: blur(40px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 40px;
+            min-width: 500px;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 
+                0 32px 80px var(--shadow-dark),
+                inset 0 1px 0 var(--shadow-light);
+            animation: scaleIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .modal h2 {
+            color: var(--text-primary);
+            margin-bottom: 30px;
+            font-size: 2em;
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .close {
+            position: absolute;
+            top: 24px;
+            right: 28px;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: all 0.3s ease;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: var(--input-bg);
+            border: 1px solid var(--glass-border);
+        }
+
+        .close:hover {
+            color: var(--text-primary);
+            background: var(--card-bg);
+            transform: rotate(90deg);
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-size: 0.95em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 16px 20px;
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            font-size: 1em;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(20px);
+        }
+
+        .form-group input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #74b9ff;
+            box-shadow: 0 0 0 4px rgba(116, 185, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .position-item {
+            background: var(--input-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            font-size: 0.9em;
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+        }
+
+        .position-item:hover {
+            background: var(--card-bg);
+            transform: translateY(-2px);
+        }
+
+        .position-summary {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 700;
+            color: var(--text-primary);
+            padding-top: 16px;
+            border-top: 1px solid var(--glass-border);
+            margin-top: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.9em;
+        }
+
+        .notification {
+            position: fixed;
+            top: 80px;
+            right: 24px;
+            padding: 16px 24px;
+            border-radius: 16px;
+            color: var(--text-primary);
+            font-weight: 600;
+            z-index: 1001;
+            backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border);
+            transform: translateX(120%);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 12px 32px var(--shadow-dark);
+            animation: pulse 2s infinite;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+            animation: none;
+        }
+
+        .notification.success {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(16, 185, 129, 0.1));
+            border-color: rgba(16, 185, 129, 0.4);
+        }
+
+        .notification.error {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(239, 68, 68, 0.1));
+            border-color: rgba(239, 68, 68, 0.4);
+        }
+
+        .data-info {
+            position: fixed;
+            bottom: 24px;
+            left: 24px;
+            background: var(--card-bg);
+            backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 16px 20px;
+            color: var(--text-secondary);
+            font-size: 0.85em;
+            z-index: 100;
+            max-width: 320px;
+            opacity: 0.9;
+            transition: all 0.4s ease;
+            animation: fadeInUp 2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .data-info:hover {
+            opacity: 1;
+            transform: translateY(-4px);
+        }
+
+        .data-info-icon {
+            display: inline-block;
+            margin-right: 8px;
+            font-size: 1.2em;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 24px;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .input-group {
+                flex-direction: column;
+            }
+            
+            .modal-content {
+                min-width: 90vw;
+                padding: 24px;
+            }
+
+            .portfolio-table-container {
+                overflow-x: auto;
+            }
+
+            .portfolio-table {
+                min-width: 800px;
+            }
+
+            .theme-selector {
+                top: 10px;
+                right: 10px;
+                padding: 12px;
+            }
+
+            .theme-option {
+                width: 32px;
+                height: 32px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="theme-selector">
+        <span class="theme-label">Tema:</span>
+        <div class="theme-option theme-dark active" onclick="changeTheme('dark')" title="Oscuro"></div>
+        <div class="theme-option theme-ocean-color" onclick="changeTheme('ocean')" title="Océano"></div>
+        <div class="theme-option theme-sunset-color" onclick="changeTheme('sunset')" title="Atardecer"></div>
+        <div class="theme-option theme-forest-color" onclick="changeTheme('forest')" title="Bosque"></div>
+        <div class="theme-option theme-aurora-color" onclick="changeTheme('aurora')" title="Aurora"></div>
+        <div class="theme-option theme-galaxy-color" onclick="changeTheme('galaxy')" title="Galaxia"></div>
+        <div class="theme-option theme-minimal-color" onclick="changeTheme('minimal')" title="Minimal"></div>
+    </div>
+
+    <div class="container">
+        <div class="main-container">
+            <div class="header">
+                <div class="portfolio-title" id="portfolioTitle" onclick="editPortfolioName()">📈 Mi Cartera de Trading</div>
+                <p class="subtitle">Gestiona tu portafolio de inversiones con elegancia</p>
+            </div>
+
+            <div class="portfolio-summary">
+                <div class="summary-card">
+                    <h3>Valor Total</h3>
+                    <div class="value" id="totalValue">$0.00</div>
+                    <div class="change" id="totalChange">+$0.00 (0.00%)</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Ganancia/Pérdida</h3>
+                    <div class="value" id="totalPnL">$0.00</div>
+                    <div class="change" id="totalPnLPercent">0.00%</div>
+                </div>
+                <div class="summary-card">
+                    <h3>Inversión Total</h3>
+                    <div class="value" id="totalInvested">$0.00</div>
+                    <div class="change" id="stockCount">0 acciones</div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-primary" onclick="openModal()">➕ Agregar Acción</button>
+                <button class="btn btn-secondary" onclick="updatePrices()">🔄 Actualizar Precios</button>
+                <button class="btn btn-success" onclick="exportData()">📤 Exportar Datos</button>
+                <button class="btn btn-edit" onclick="importData()">📥 Importar Datos</button>
+                <input type="file" id="importFile" accept=".json" style="display: none;" onchange="handleImport(event)">
+                <div class="input-group">
+                    <select id="sortBy">
+                        <option value="symbol">Ordenar por Símbolo</option>
+                        <option value="value">Ordenar por Valor</option>
+                        <option value="pnl">Ordenar por P&L</option>
+                        <option value="pnlPercent">Ordenar por P&L %</option>
+                    </select>
+                    <input type="text" id="searchStock" placeholder="Buscar acción..." onkeyup="filterStocks()">
+                </div>
+            </div>
+
+            <div class="portfolio-table-container">
+                <table class="portfolio-table">
+                    <thead>
+                        <tr>
+                            <th>Símbolo</th>
+                            <th>Precio Actual</th>
+                            <th>Acciones</th>
+                            <th>Precio Promedio</th>
+                            <th>Valor Total</th>
+                            <th>P&L</th>
+                            <th>P&L %</th>
+                            <th>Posiciones</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="portfolioTableBody">
+                        <!-- Las filas se generarán dinámicamente -->
+                    </tbody>
+                </table>
+                <div id="emptyState" class="empty-state" style="display: none;">
+                    <div class="empty-state-icon">📊</div>
+                    <h3>Tu cartera está vacía</h3>
+                    <p>Comienza agregando tu primera acción</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="data-info">
+        <span class="data-info-icon">☁️</span>
+        <strong>Datos en la nube</strong><br>
+        Firebase • Sincronizado entre dispositivos
+    </div>
+
+    <!-- Modal para agregar/editar acciones -->
+    <div id="stockModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle">Agregar Nueva Acción</h2>
+            <form id="stockForm">
+                <div class="form-group">
+                    <label for="stockSymbol">Símbolo de la Acción</label>
+                    <input type="text" id="stockSymbol" required placeholder="Ej: AAPL, GOOGL, TSLA">
+                </div>
+                <div class="form-group">
+                    <label for="stockCurrentPrice">Precio Actual</label>
+                    <input type="number" id="stockCurrentPrice" required min="0" step="0.01" placeholder="Ej: 160.75">
+                </div>
+                
+                <div id="positionsContainer">
+                    <!-- Las posiciones se mostrarán aquí -->
+                </div>
+                
+                <div class="form-group">
+                    <label>Nueva Posición</label>
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                        <input type="number" id="stockShares" placeholder="Cantidad" min="1" style="flex: 1; min-width: 120px;">
+                        <input type="number" id="stockPurchasePrice" placeholder="Precio" min="0" step="0.01" style="flex: 1; min-width: 120px;">
+                        <button type="button" class="btn btn-success btn-small" onclick="addPosition()">+ Agregar</button>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%;" id="submitBtn">Guardar Acción</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Cargar sistema de autenticación Firebase -->
+    <script type="module" src="firebase-auth.js"></script>
+    
+    <script>
+        // Variables globales
+        let portfolio = [];
+        let currentEditingStock = null;
+        let tempPositions = [];
+        let portfolioName = '📈 Mi Cartera de Trading';
+        let currentTheme = 'dark';
+
+        // Función para inicializar la aplicación
+        function initializeApp() {
+            if (!window.firebaseAuth || !window.firebaseAuth.isAuthenticated) {
+                return;
+            }
+            
+            setupEventListeners();
+            renderPortfolio();
+        }
+
+        // Configurar event listeners
+        function setupEventListeners() {
+            document.getElementById('stockForm').addEventListener('submit', handleStockSubmit);
+            document.getElementById('sortBy').addEventListener('change', renderPortfolio);
+
+            window.onclick = function(event) {
+                const modal = document.getElementById('stockModal');
+                if (event.target === modal) {
+                    closeModal();
+                }
+            }
+        }
+
+        // Función para cambiar tema
+        function changeTheme(theme) {
+            document.body.style.opacity = '0.8';
+            
+            setTimeout(() => {
+                document.body.className = theme === 'dark' ? '' : `theme-${theme}`;
+                currentTheme = theme;
+                
+                // Guardar tema en Firebase
+                if (window.firebaseAuth && window.firebaseAuth.isAuthenticated) {
+                    window.firebaseAuth.saveUserSettings({
+                        theme: theme,
+                        currency: 'USD',
+                        notifications: true
+                    });
+                }
+                
+                document.querySelectorAll('.theme-option').forEach(option => {
+                    option.classList.remove('active');
+                });
+                
+                const themeClass = theme === 'dark' ? 'theme-dark' : `theme-${theme}-color`;
+                document.querySelector(`.${themeClass}`).classList.add('active');
+                
+                document.body.style.opacity = '1';
+            }, 200);
+        }
+
+        // Función para editar nombre de cartera
+        function editPortfolioName() {
+            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+            
+            const titleElement = document.getElementById('portfolioTitle');
+            const currentName = titleElement.textContent;
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentName;
+            input.className = 'portfolio-title-input';
+            input.maxLength = 50;
+            
+            input.addEventListener('blur', savePortfolioName);
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    input.blur();
+                }
+                if (e.key === 'Escape') {
+                    titleElement.textContent = currentName;
+                    titleElement.style.display = 'inline-block';
+                    input.remove();
+                }
+            });
+            
+            async function savePortfolioName() {
+                const newName = input.value.trim() || currentName;
+                portfolioName = newName;
+                
+                // Guardar en Firebase
+                await window.firebaseAuth.savePortfolio(portfolio, portfolioName);
+                
+                titleElement.textContent = newName;
+                titleElement.style.display = 'inline-block';
+                input.remove();
+                showNotification('Nombre de cartera actualizado');
+            }
+            
+            titleElement.style.display = 'none';
+            titleElement.parentNode.insertBefore(input, titleElement);
+            input.focus();
+            input.select();
+        }
+
+        // Función para mostrar notificaciones
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.classList.add('show'), 100);
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    if (document.body.contains(notification)) {
+                        document.body.removeChild(notification);
+                    }
+                }, 500);
+            }, 3000);
+        }
+
+        // Funciones de exportación e importación
+        function exportData() {
+            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+            
+            const user = window.firebaseAuth.getCurrentUser();
+            const data = {
+                portfolio: portfolio,
+                portfolioName: portfolioName,
+                theme: currentTheme,
+                user: {
+                    email: user.email,
+                    displayName: user.displayName
+                },
+                exportDate: new Date().toISOString(),
+                version: '4.0-firebase'
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `cartera-firebase-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showNotification('Datos exportados exitosamente');
+        }
+
+        function importData() {
+            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+            document.getElementById('importFile').click();
+        }
+
+        async function handleImport(event) {
+            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+            
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    if (data.portfolio && Array.isArray(data.portfolio)) {
+                        if (confirm('¿Estás seguro de que quieres importar estos datos? Esto reemplazará tu cartera actual.')) {
+                            portfolio = data.portfolio;
+                            portfolioName = data.portfolioName || '📈 Mi Cartera de Trading';
+                            currentTheme = data.theme || 'dark';
+                            
+                            // Guardar en Firebase
+                            await window.firebaseAuth.savePortfolio(portfolio, portfolioName);
+                            
+                            document.getElementById('portfolioTitle').textContent = portfolioName;
+                            changeTheme(currentTheme);
+                            renderPortfolio();
+                            
+                            showNotification('Datos importados exitosamente');
+                        }
+                    } else {
+                        throw new Error('Formato de archivo inválido');
+                    }
+                } catch (error) {
+                    showNotification('Error al importar el archivo: ' + error.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+            
+            event.target.value = '';
+        }
+
+        // Función para abrir modal
+        function openModal(stockId = null) {
+            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+            
+            currentEditingStock = stockId;
+            tempPositions = [];
+            
+            if (stockId) {
+                const stock = portfolio.find(s => s.id === stockId);
+                document.getElementById('modalTitle').textContent = `Editar ${stock.symbol}`;
+                document.getElementById('stockSymbol').value = stock.symbol;
+                document.getElementById('stockSymbol').disabled = true;
+                document.getElementById('stockCurrentPrice').value = stock.currentPrice;
+                document.getElementById('submitBtn').textContent = 'Actualizar Acción';
+                
+                tempPositions = [...stock.positions];
+            } else {
+                document.getElementById('modalTitle').textContent = 'Agregar Nueva Acción';
+                document.getElementById('stockSymbol').disabled = false;
+                document.getElementById('submitBtn').textContent = 'Guardar Acción';
+                document.getElementById('stockForm').reset();
+            }
+            
+            renderPositions();
+            document.getElementById('stockModal').style.display = 'block';
+        }
+
+        // Función para cerrar modal
+        function closeModal() {
+            document.getElementById('stockModal').style.display = 'none';
+            document.getElementById('stockForm').reset();
+            currentEditingStock = null;
+            tempPositions = [];
+        }
+
+        // Función para agregar posición
+        function addPosition() {
+            const shares = parseInt(document.getElementById('stockShares').value);
+            const price = parseFloat(document.getElementById('stockPurchasePrice').value);
+            
+            if (!shares || !price || shares <= 0 || price <= 0) {
+                showNotification('Ingresa cantidad y precio válidos', 'error');
+                return;
+            }
+            
+            tempPositions.push({
+                id: Date.now(),
+                shares: shares,
+                price: price,
+                date: new Date().toLocaleDateString()
+            });
+            
+            document.getElementById('stockShares').value = '';
+            document.getElementById('stockPurchasePrice').value = '';
+            renderPositions();
+        }
+
+        // Función para eliminar posición
+        function removePosition(positionId) {
+            tempPositions = tempPositions.filter(pos => pos.id !== positionId);
+            renderPositions();
+        }
+
+        // Función para renderizar posiciones
+        function renderPositions() {
+            const container = document.getElementById('positionsContainer');
+            
+            if (tempPositions.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+            
+            const totalShares = tempPositions.reduce((sum, pos) => sum + pos.shares, 0);
+            const totalValue = tempPositions.reduce((sum, pos) => sum + (pos.shares * pos.price), 0);
+            const avgPrice = totalValue / totalShares;
+            
+            container.innerHTML = `
+                <div class="form-group">
+                    <label>Posiciones Actuales</label>
+                    ${tempPositions.map(pos => `
+                        <div class="position-item">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span><strong>${pos.shares}</strong> acciones @ <strong>${pos.price.toFixed(2)}</strong></span>
+                                <button type="button" class="btn btn-danger btn-icon" onclick="removePosition(${pos.id})" title="Eliminar posición">×</button>
+                            </div>
+                            <div style="font-size: 0.8em; opacity: 0.7; margin-top: 4px;">
+                                Valor: ${(pos.shares * pos.price).toFixed(2)} • ${pos.date}
+                            </div>
+                        </div>
+                    `).join('')}
+                    <div class="position-summary">
+                        <span>Total: ${totalShares} acciones</span>
+                        <span>Precio promedio: ${avgPrice.toFixed(2)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Función para manejar envío del formulario
+        async function handleStockSubmit(e) {
+            e.preventDefault();
+            
+            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+            
+            const symbol = document.getElementById('stockSymbol').value.toUpperCase();
+            const currentPrice = parseFloat(document.getElementById('stockCurrentPrice').value);
+            
+            if (tempPositions.length === 0) {
+                showNotification('Agrega al menos una posición', 'error');
+                return;
+            }
+            
+            if (currentEditingStock) {
+                const stockIndex = portfolio.findIndex(s => s.id === currentEditingStock);
+                portfolio[stockIndex].currentPrice = currentPrice;
+                portfolio[stockIndex].positions = [...tempPositions];
+                showNotification(`${symbol} actualizado exitosamente`);
+            } else {
+                const existingStock = portfolio.find(stock => stock.symbol === symbol);
+                if (existingStock) {
+                    showNotification('Esta acción ya existe en tu cartera', 'error');
+                    return;
+                }
+                
+                const newStock = {
+                    id: Date.now(),
+                    symbol,
+                    currentPrice,
+                    initialPrice: currentPrice,
+                    positions: [...tempPositions],
+                    dateAdded: new Date().toLocaleDateString()
+                };
+                
+                portfolio.push(newStock);
+                showNotification(`${symbol} agregado exitosamente a tu cartera`);
+            }
+            
+            await savePortfolio();
+            renderPortfolio();
+            closeModal();
+        }
+
+        // Función para guardar portfolio en Firebase
+        async function savePortfolio() {
+            if (window.firebaseAuth && window.firebaseAuth.isAuthenticated) {
+                await window.firebaseAuth.savePortfolio(portfolio, portfolioName);
+            }
+        }
+
+        // Función para eliminar acción
+        async function removeStock(id) {
+            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+            
+            if (confirm('¿Estás seguro de que quieres eliminar esta acción?')) {
+                const stock = portfolio.find(s => s.id === id);
+                portfolio = portfolio.filter(stock => stock.id !== id);
+                await savePortfolio();
+                renderPortfolio();
+                showNotification(`${stock.symbol} eliminado de tu cartera`);
+            }
+        }
+
+        // Función para actualizar precios
+        async function updatePrices() {
+            if (!window.firebaseAuth || !window.firebaseAuth.requireAuth()) return;
+            
+            const updateBtn = document.querySelector('button[onclick="updatePrices()"]');
+            const originalText = updateBtn.textContent;
+            updateBtn.textContent = '🔄 Actualizando...';
+            updateBtn.disabled = true;
+            
+            setTimeout(async () => {
+                portfolio.forEach(stock => {
+                    if (!stock.initialPrice) {
+                        stock.initialPrice = stock.currentPrice;
+                    }
+                    
+                    const minVariation = -0.10;
+                    const maxVariation = 0.15;
+                    const randomVariation = minVariation + (Math.random() * (maxVariation - minVariation));
+                    
+                    stock.currentPrice = stock.initialPrice * (1 + randomVariation);
+                    stock.currentPrice = Math.round(stock.currentPrice * 100) / 100;
+                    stock.currentPrice = Math.max(0.01, stock.currentPrice);
+                });
+                
+                await savePortfolio();
+                renderPortfolio();
+                
+                updateBtn.textContent = originalText;
+                updateBtn.disabled = false;
+                
+                showNotification('Precios actualizados con datos simulados');
+            }, 1000);
+        }
+
+        // Función para filtrar acciones
+        function filterStocks() {
+            const searchTerm = document.getElementById('searchStock').value.toLowerCase();
+            const rows = document.querySelectorAll('#portfolioTableBody tr');
+            
+            rows.forEach(row => {
+                const symbol = row.cells[0].textContent.toLowerCase();
+                if (symbol.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        // Función para calcular estadísticas
+        function calculateStockStats(stock) {
+            const totalShares = stock.positions.reduce((sum, pos) => sum + pos.shares, 0);
+            const totalCost = stock.positions.reduce((sum, pos) => sum + (pos.shares * pos.price), 0);
+            const avgPurchasePrice = totalCost / totalShares;
+            const totalValue = totalShares * stock.currentPrice;
+            const pnl = totalValue - totalCost;
+            const pnlPercent = (pnl / totalCost) * 100;
+            
+            return {
+                totalShares,
+                totalCost,
+                avgPurchasePrice,
+                totalValue,
+                pnl,
+                pnlPercent
+            };
+        }
+
+        // Función para renderizar portfolio
+        function renderPortfolio() {
+            const tableBody = document.getElementById('portfolioTableBody');
+            const emptyState = document.getElementById('emptyState');
+            const sortBy = document.getElementById('sortBy').value;
+            
+            if (portfolio.length === 0) {
+                tableBody.innerHTML = '';
+                emptyState.style.display = 'block';
+                updateSummary();
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+            
+            let sortedPortfolio = [...portfolio];
+            switch (sortBy) {
+                case 'symbol':
+                    sortedPortfolio.sort((a, b) => a.symbol.localeCompare(b.symbol));
+                    break;
+                case 'value':
+                    sortedPortfolio.sort((a, b) => {
+                        const aStats = calculateStockStats(a);
+                        const bStats = calculateStockStats(b);
+                        return bStats.totalValue - aStats.totalValue;
+                    });
+                    break;
+                case 'pnl':
+                    sortedPortfolio.sort((a, b) => {
+                        const aStats = calculateStockStats(a);
+                        const bStats = calculateStockStats(b);
+                        return bStats.pnl - aStats.pnl;
+                    });
+                    break;
+                case 'pnlPercent':
+                    sortedPortfolio.sort((a, b) => {
+                        const aStats = calculateStockStats(a);
+                        const bStats = calculateStockStats(b);
+                        return bStats.pnlPercent - aStats.pnlPercent;
+                    });
+                    break;
+            }
+            
+            tableBody.innerHTML = '';
+            
+            sortedPortfolio.forEach((stock, index) => {
+                const stats = calculateStockStats(stock);
+                const pnlClass = stats.pnl >= 0 ? 'positive' : 'negative';
+                
+                const row = document.createElement('tr');
+                row.style.animationDelay = `${index * 0.1}s`;
+                row.innerHTML = `
+                    <td>
+                        <div class="stock-symbol">${stock.symbol}</div>
+                    </td>
+                    <td>
+                        <span class="${pnlClass}" style="font-weight: 700;">${stock.currentPrice.toFixed(2)}</span>
+                    </td>
+                    <td>
+                        <span style="font-weight: 600;">${stats.totalShares}</span>
+                    </td>
+                    <td>
+                        <span style="font-weight: 600;">${stats.avgPurchasePrice.toFixed(2)}</span>
+                    </td>
+                    <td>
+                        <span style="font-weight: 700; font-size: 1.05em;">${stats.totalValue.toFixed(2)}</span>
+                    </td>
+                    <td>
+                        <span class="${pnlClass}" style="font-weight: 700;">${stats.pnl.toFixed(2)}</span>
+                    </td>
+                    <td>
+                        <span class="${pnlClass}" style="font-weight: 700;">${stats.pnlPercent >= 0 ? '+' : ''}${stats.pnlPercent.toFixed(2)}%</span>
+                        <div class="progress-mini">
+                            <div class="progress-mini-fill" style="width: ${Math.max(0, Math.min(100, stats.pnlPercent + 50))}%"></div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="stock-badge">
+                            📊 ${stock.positions.length} posición${stock.positions.length !== 1 ? 'es' : ''}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="actions-cell">
+                            <button class="btn btn-edit btn-icon" onclick="openModal(${stock.id})" title="Editar acción">✏️</button>
+                            <button class="btn btn-danger btn-icon" onclick="removeStock(${stock.id})" title="Eliminar acción">🗑️</button>
+                        </div>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+            
+            updateSummary();
+        }
+
+        // Función para actualizar resumen
+        function updateSummary() {
+            let totalValue = 0;
+            let totalCost = 0;
+            
+            portfolio.forEach(stock => {
+                const stats = calculateStockStats(stock);
+                totalValue += stats.totalValue;
+                totalCost += stats.totalCost;
+            });
+            
+            const totalPnL = totalValue - totalCost;
+            const totalPnLPercent = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
+            
+            document.getElementById('totalValue').textContent = `${totalValue.toFixed(2)}`;
+            document.getElementById('totalInvested').textContent = `${totalCost.toFixed(2)}`;
+            document.getElementById('totalPnL').textContent = `${totalPnL.toFixed(2)}`;
+            document.getElementById('totalPnLPercent').textContent = `${totalPnLPercent >= 0 ? '+' : ''}${totalPnLPercent.toFixed(2)}%`;
+            document.getElementById('stockCount').textContent = `${portfolio.length} acciones`;
+            
+            const pnlClass = totalPnL >= 0 ? 'positive' : 'negative';
+            document.getElementById('totalPnL').className = `value ${pnlClass}`;
+            document.getElementById('totalPnLPercent').className = `change ${pnlClass}`;
+            
+            const changeText = totalPnL >= 0 ? '+' : '';
+            document.getElementById('totalChange').textContent = `${changeText}${totalPnL.toFixed(2)} (${totalPnLPercent >= 0 ? '+' : ''}${totalPnLPercent.toFixed(2)}%)`;
+            document.getElementById('totalChange').className = `change ${pnlClass}`;
+        }
+
+        // Inicializar cuando se cargue la página
+        document.addEventListener('DOMContentLoaded', function() {
+            const checkAuth = setInterval(() => {
+                if (window.firebaseAuth && window.firebaseAuth.isAuthenticated) {
+                    clearInterval(checkAuth);
+                    
+                    // Cargar datos desde Firebase
+                    if (window.firebaseAuth.portfolioData) {
+                        portfolio = window.firebaseAuth.portfolioData.stocks || [];
+                        portfolioName = window.firebaseAuth.portfolioData.name || '📈 Mi Cartera de Trading';
+                        document.getElementById('portfolioTitle').textContent = portfolioName;
+                    }
+                    
+                    // Aplicar tema del usuario
+                    if (window.firebaseAuth.userData && window.firebaseAuth.userData.settings) {
+                        changeTheme(window.firebaseAuth.userData.settings.theme || 'dark');
+                    }
+                    
+                    initializeApp();
+                }
+            }, 100);
+            
+            setTimeout(() => {
+                clearInterval(checkAuth);
+            }, 10000);
+        });
+
+        // Hacer funciones globales para compatibilidad
+        window.changeTheme = changeTheme;
+        window.portfolio = portfolio;
+        window.currentTheme = currentTheme;
+        window.renderPortfolio = renderPortfolio;
+        window.showNotification = showNotification;
+        window.portfolioName = portfolioName;
+    </script>
+</body>
+</html>
